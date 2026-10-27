@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ titulo }}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'tableros/css/snd.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <header class="snd-header">
+        <div class="snd-container">
+            <div class="snd-brand">
+                <span class="snd-brand-mark">SND</span>
+                <span class="snd-brand-title">Sistema Nacional de Datos — Mortalidad Materna</span>
+            </div>
+            <nav class="snd-nav">
+                {% if user.rol == 'DIR' or user.rol == 'ADMIN' %}
+                    <a href="{% url 'tableros:directivo' %}">Tablero Directivo</a>
+                {% endif %}
+                <a href="{% url 'tableros:publico' %}">Tablero Público</a>
+                <span class="snd-user">{{ user.username }} ({{ user.get_rol_display }})</span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="snd-container snd-main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="snd-footer">
+        <div class="snd-container">
+            <p>Fuente: Registros de mortalidad materna, DGIS/SSA. Datos preliminares sujetos a revisión.</p>
+        </div>
+    </footer>
+</body>
+</html>

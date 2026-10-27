@@ -1,0 +1,41 @@
+{% extends 'tableros/base.html' %}
+
+{% block content %}
+<h1 class="snd-h1">{{ titulo }}</h1>
+
+{% if messages %}
+<div class="snd-card">
+    {% for m in messages %}
+        <p class="snd-mensaje snd-mensaje-{{ m.tags }}">{{ m }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+<section class="snd-card">
+    <form method="post" enctype="multipart/form-data" id="form-carga">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="snd-btn" id="btn-submit">Subir y Procesar archivo</button>
+        <p id="msg-procesando" style="display:none; color: #691C32; font-weight: bold; margin-top: 15px;">
+            ⏳ Subiendo y procesando datos. Por favor, espera un momento (no cierres esta ventana)...
+        </p>
+    </form>
+    <p class="snd-disclaimer" style="margin-top: 20px;">
+        El sistema calculará un hash SHA-256 para detectar duplicados y ejecutará el proceso ETL (Bronze -> Silver -> Gold) de forma automática para actualizar los tableros.
+    </p>
+</section>
+
+<script>
+    document.getElementById('form-carga').addEventListener('submit', function() {
+        // Al enviar el formulario, bloqueamos el botón y mostramos el mensaje
+        const btn = document.getElementById('btn-submit');
+        const msg = document.getElementById('msg-procesando');
+        
+        btn.disabled = true;
+        btn.innerText = 'Procesando...';
+        btn.style.opacity = '0.7';
+        btn.style.cursor = 'not-allowed';
+        msg.style.display = 'block';
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends 'tableros/base.html' %}
+{% load static %}
+
+{% block content %}
+<h1 class="snd-h1">{{ titulo }}</h1>
+
+<form method="get" class="snd-filters">
+    <label>Año (desde 2014):
+        <select name="anio" required>
+            {% for a in anios %}
+                <option value="{{ a }}" {% if a == anio %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>Entidad:
+        <select name="id_entidad" required>
+            <option value="">— Selecciona —</option>
+            {% for e in entidades %}
+                <option value="{{ e.id_entidad }}" {% if id_entidad == e.id_entidad %}selected{% endif %}>
+                    {{ e.entidad_nombre }}
+                </option>
+            {% endfor %}
+        </select>
+    </label>
+    <button type="submit" class="snd-btn">Consultar</button>
+</form>
+
+<section class="snd-card">
+    <h2>Indicador {{ anio }}{% if entidad_sel %} — {{ entidad_sel.entidad_nombre }}{% endif %}</h2>
+    <p class="snd-kpi-num">{{ kpi.rmm|default:"—" }}</p>
+    <p class="snd-kpi-detalle">
+        {{ kpi.defunciones|default:"0" }} defunciones incluidas · {{ kpi.nacimientos|default:"0" }} nacimientos estimados
+    </p>
+</section>
+
+<div class="snd-grid-2">
+    <section class="snd-card">
+        <h2>Proporción directa / indirecta</h2>
+        <div style="position: relative; height: 280px; width: 100%;">
+            <canvas id="chartDona"></canvas>
+        </div>
+    </section>
+    <section class="snd-card">
+        <h2>Distribución por edad</h2>
+        <div style="position: relative; height: 280px; width: 100%;">
+            <canvas id="chartEdad"></canvas>
+        </div>
+    </section>
+</div>
+
+<section class="snd-card">
+    <h2>Tabla de causas agrupadas</h2>
+    <table class="snd-table">
+        <thead>
+            <tr>
+                <th>Causa (Grupo DGE)</th>
+                <th style="text-align: right;">Defunciones</th>
+            </tr>
+        </thead>
+        <tbody id="tabla-causas-body">
+            <!-- Se llena con JavaScript -->
+        </tbody>
+    </table>
+</section>
+
+<p class="snd-disclaimer">{{ disclaimer }}</p>
+
+<!-- Inyección del JSON con los datos -->
+{{ datos_publicos_json|json_script:"datos-publicos" }}
+
+<script>
+try {
+    const data = JSON.parse(document.getElementById('datos-publicos').textContent);
+
+    // 1. Gráfica Dona (Directa vs Indirecta)
+    const directa = data.causas.labels.map((label, i) => {
+        return label !== 'Indirectas' ? Number(data.causas.valores[i]) : 0;
+    }).reduce((a, b) => a + b, 0);
+    
+    const indirecta = data.causas.labels.map((label, i) => {
+        return label === 'Indirectas' ? Number(data.causas.valores[i]) : 0;
+    }).reduce((a, b) => a + b, 0);
+
+    new Chart(document.getElementById('chartDona'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Directa', 'Indirecta'],
+            datasets: [{
+                data: [directa, indirecta],
+                backgroundColor: ['#611232', '#1a6e3a'],
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    // 2. Gráfica de Edad
+    new Chart(document.getElementById('chartEdad'), {
+        type: 'bar',
+        data: {
+            labels: data.edades.labels,
+            datasets: [{
+                label: 'Defunciones',
+                data: data.edades.valores,
+                backgroundColor: '#611232',
+            }]
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // 3. Llenar la Tabla de Causas
+    const tbody = document.getElementById('tabla-causas-body');
+    if (data.causas.labels.length > 0 && data.causas.labels[0] !== 'Sin datos') {
+        data.causas.labels.forEach((label, index) => {
+            const valor = data.causas.valores[index];
+            tbody.innerHTML += `
+                <tr>
+                    <td>${label}</td>
+                    <td style="text-align: right;"><strong>${valor}</strong></td>
+                </tr>
+            `;
+        });
+    } else {
+        tbody.innerHTML = '<tr><td colspan="2" style="text-align: center;">Sin datos para los filtros seleccionados.</td></tr>';
+    }
+
+} catch (e) {
+    console.error("Error al dibujar las gráficas del tablero público:", e);
+}
+</script>
+{% endblock %}
