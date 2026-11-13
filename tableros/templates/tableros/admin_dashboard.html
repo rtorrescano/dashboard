@@ -1,0 +1,67 @@
+{% extends 'tableros/base.html' %}
+{% load static %}
+
+{% block title %}Panel de Administración - SND{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm border-0" style="border-top: 5px solid #611232;">
+                <div class="card-header bg-white pb-0 border-0 mt-3">
+                    <h2 class="text-center" style="color: #611232; font-weight: bold;">Panel de Control Administrativo</h2>
+                    <p class="text-center text-muted">Selecciona un módulo para gestionar el Sistema Nacional de Datos</p>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <div class="row g-4">
+                        <!-- Módulo 1: Admin de Django -->
+                        <div class="col-md-4">
+                            <a href="/admin/" class="text-decoration-none">
+                                <div class="card h-100 text-center p-4 shadow-sm hover-card" style="border-top: 4px solid #10312B;">
+                                    <div style="font-size: 3rem; margin-bottom: 15px;">⚙️</div>
+                                    <h5 class="fw-bold" style="color: #10312B;">Administrador Django</h5>
+                                    <p class="text-muted small">Gestiona usuarios, roles, catálogos y la base de datos maestra del sistema.</p>
+                                </div>
+                            </a>
+                        </div>
+
+                        <!-- Módulo 2: Carga de Datos -->
+                        <div class="col-md-4">
+                            <a href="{% url 'subir_datos' %}" class="text-decoration-none">
+                                <div class="card h-100 text-center p-4 shadow-sm hover-card" style="border-top: 4px solid #1D6F42;">
+                                    <div style="font-size: 3rem; margin-bottom: 15px;">📁</div>
+                                    <h5 class="fw-bold" style="color: #1D6F42;">Carga de Datos</h5>
+                                    <p class="text-muted small">Sube nuevos archivos CSV del INEGI para actualizar las capas Bronze, Silver y Gold.</p>
+                                </div>
+                            </a>
+                        </div>
+
+                        <!-- Módulo 3: Tablero Directivo -->
+                        <div class="col-md-4">
+                            <a href="{% url 'directivo' %}" class="text-decoration-none">
+                                <div class="card h-100 text-center p-4 shadow-sm hover-card" style="border-top: 4px solid #BC955C;">
+                                    <div style="font-size: 3rem; margin-bottom: 15px;">📊</div>
+                                    <h5 class="fw-bold" style="color: #BC955C;">Tablero Directivo</h5>
+                                    <p class="text-muted small">Visualiza el tablero analítico completo con KPIs, mapas y gráficas avanzadas.</p>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <form method="post" action="{% url 'logout' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger fw-bold">Cerrar Sesión</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-card { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
+    .hover-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,0,0,0.1) !important; }
+</style>
+{% endblock %}

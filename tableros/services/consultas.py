@@ -1,144 +1,163 @@
 from django.db import connection
 
-def dictfetchall(cursor):
-    columnas = [c[0] for c in cursor.description]
-    return [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+def _fetchall_dict(cur):
+    columns = [col[0] for col in cur.description]
+    return [dict(zip(columns, row)) for row in cur.fetchall()]
 
-# --- KPIs ---
-def kpi_rmm_ultimo_anio(anio=None, entidad_id=None):
-    where_clause = "WHERE 1=1"
+def _build_where(anio, entidad_id):
+    where = ["anio >= 2014"]
     params = []
     if anio:
-        where_clause += " AND anio = %s"
+        where.append("anio = %s")
         params.append(anio)
     if entidad_id:
-        where_clause += " AND id_entidad = %s"
-        params.append(entidad_id)
+        where.append("entidad_cve = %s")
+        params.append(str(entidad_id).zfill(2))
+    return " WHERE " + " AND ".join(where), params
 
-    with connection.cursor() as cur:
-        cur.execute(f"""
-            SELECT MAX(anio) AS anio, SUM(defunciones_incluidas) AS defunciones,
-                   SUM(nacimientos_estimados) AS nacimientos,
-                   CASE WHEN SUM(nacimientos_estimados) > 0
-                        THEN ROUND(SUM(defunciones_incluidas)::numeric / SUM(nacimientos_estimados) * 100000, 2)
-                        ELSE NULL END AS rmm
-            FROM marts.mv_rmm_anual_entidad {where_clause}
-        """, params)
-        filas = dictfetchall(cur)
-        return filas[0] if filas and filas[0]['defunciones'] is not None else None
-
-# --- Agrupaciones BIRMM ---
-def causas_agrupadas(anio=None, entidad_id=None):
-    where_clause = "WHERE f.incluida_en_rmm = TRUE"
-    params = []
-    if anio:
-        where_clause += " AND dt.anio = %s"
-        params.append(anio)
-    if entidad_id:
-        where_clause += " AND dg.id_entidad = %s"
-        params.append(entidad_id)
-
-    with connection.cursor() as cur:
-        cur.execute(f"""
-            SELECT 
-                CASE 
-                    WHEN dc.codigo_cie10 ~* '^O0[0-8]' THEN 'Aborto'
-                    WHEN dc.codigo_cie10 ~* '^O1[0-6]' THEN 'Hipertensión'
-                    WHEN dc.codigo_cie10 ~* '^(O2[0-9]|O3[0-9]|O4[0-8]|O6[0-9]|O7[0-5])' THEN 'Hemorragia'
-                    WHEN dc.codigo_cie10 ~* '^(O85|O86|O88|A34)' THEN 'Sepsis'
-                    WHEN dc.codigo_cie10 ~* '^(O98|O99|B2[0-4]|U07)' THEN 'Indirectas'
-                    ELSE 'Otras' 
-                END AS etiqueta, 
-                COUNT(*) AS valor
-            FROM gold.fact_mortalidad_materna f
-            JOIN gold.dim_tiempo dt ON dt.id_tiempo = f.id_tiempo
-            JOIN gold.dim_geografia dg ON dg.id_geografia = f.id_geografia
-            JOIN gold.dim_causa dc ON dc.id_causa = f.id_causa
-            {where_clause}
-            GROUP BY etiqueta ORDER BY valor DESC
-        """, params)
-        return dictfetchall(cur)
-
-def distribucion_edad(anio=None, entidad_id=None):
-    where_clause = "WHERE f.incluida_en_rmm = TRUE"
-    params = []
-    if anio:
-        where_clause += " AND dt.anio = %s"
-        params.append(anio)
-    if entidad_id:
-        where_clause += " AND dg.id_entidad = %s"
-        params.append(entidad_id)
-
-    with connection.cursor() as cur:
-        cur.execute(f"""
-            SELECT COALESCE(de.edad_quinquenal, 'No especificada') AS etiqueta, COUNT(*) AS valor
-            FROM gold.fact_mortalidad_materna f
-            JOIN gold.dim_tiempo dt ON dt.id_tiempo = f.id_tiempo
-            JOIN gold.dim_geografia dg ON dg.id_geografia = f.id_geografia
-            JOIN gold.dim_edad de ON de.id_edad = f.id_edad
-            {where_clause} GROUP BY de.edad_quinquenal ORDER BY etiqueta
-        """, params)
-        return dictfetchall(cur)
-
-# --- Gráficas Secundarias (Sitio, Escolaridad, etc.) ---
-def _query_categorico(tabla, columna, anio=None, entidad_id=None):
-    where_clause = "WHERE 1=1"
-    params = []
-    if anio:
-        where_clause += " AND anio = %s"
-        params.append(anio)
-    if entidad_id:
-        where_clause += " AND id_entidad = %s"
-        params.append(entidad_id)
-
-    with connection.cursor() as cur:
-        cur.execute(f"SELECT {columna} AS etiqueta, SUM(total) AS valor FROM {tabla} {where_clause} GROUP BY {columna} ORDER BY valor DESC LIMIT 5", params)
-        return dictfetchall(cur)
-
-def distribucion_sitio(anio=None, entidad_id=None): return _query_categorico('marts.mv_sitio_defuncion', 'sitio', anio, entidad_id)
-def distribucion_escolaridad(anio=None, entidad_id=None): return _query_categorico('marts.mv_escolaridad', 'nivel', anio, entidad_id)
-def distribucion_ocupacion(anio=None, entidad_id=None): return _query_categorico('marts.mv_ocupacion', 'ocupacion', anio, entidad_id)
-def distribucion_derechohabiencia(anio=None, entidad_id=None): return _query_categorico('marts.mv_derechohabiencia', 'derecho', anio, entidad_id)
-
-# --- Mapa (Soporta Estados o Municipios) ---
-def datos_mapa(anio=None, nivel='ESTADO'):
-    where_clause = "WHERE f.incluida_en_rmm = TRUE"
-    params = []
-    if anio:
-        where_clause += " AND dt.anio = %s"
-        params.append(anio)
-
-    with connection.cursor() as cur:
-        if nivel == 'MUNICIPIO':
-            # Agrupación por Municipio (requiere que dim_geografia tenga id_municipio)
-            cur.execute(f"""
-                SELECT dg.id_entidad, dg.id_municipio, dg.municipio_nombre, dg.entidad_nombre, COUNT(*) AS total_defunciones
-                FROM gold.fact_mortalidad_materna f
-                JOIN gold.dim_tiempo dt ON dt.id_tiempo = f.id_tiempo
-                JOIN gold.dim_geografia dg ON dg.id_geografia = f.id_geografia
-                {where_clause}
-                GROUP BY dg.id_entidad, dg.id_municipio, dg.municipio_nombre, dg.entidad_nombre
-                ORDER BY total_defunciones DESC
-            """, params)
-        else:
-            # Agrupación por Estado (Default)
-            cur.execute(f"""
-                SELECT dg.id_entidad, dg.entidad_nombre, COUNT(*) AS total_defunciones
-                FROM gold.fact_mortalidad_materna f
-                JOIN gold.dim_tiempo dt ON dt.id_tiempo = f.id_tiempo
-                JOIN gold.dim_geografia dg ON dg.id_geografia = f.id_geografia
-                {where_clause}
-                GROUP BY dg.id_entidad, dg.entidad_nombre
-                ORDER BY total_defunciones DESC
-            """, params)
-        return dictfetchall(cur)
+def datos_publicos_historicos():
+    cur = connection.cursor()
+    where_base = "WHERE anio BETWEEN 2014 AND 2024"
+    cur.execute(f"SELECT COUNT(*) FROM gold.mortalidad_consolidada {where_base}")
+    total_muertes = cur.fetchone()[0]
+    cur.execute(f"SELECT COUNT(*) FROM gold.mortalidad_consolidada {where_base} AND asistencia_medica ILIKE '%%SIN ATENCI%%'")
+    total_sin_atencion = cur.fetchone()[0]
+    cur.execute(f"SELECT anio, COUNT(*) AS total FROM gold.mortalidad_consolidada {where_base} GROUP BY 1 ORDER BY 1")
+    serie_anual = _fetchall_dict(cur)
+    cur.execute(f"SELECT COALESCE(edad_quinquenal, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where_base} GROUP BY 1 ORDER BY 1")
+    por_edad = _fetchall_dict(cur)
+    cur.execute(f"SELECT COALESCE(sitio_defuncion, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where_base} GROUP BY 1 ORDER BY 2 DESC LIMIT 4")
+    por_sitio = _fetchall_dict(cur)
+    cur.execute(f"SELECT entidad_cve AS id, COUNT(*) AS total FROM gold.mortalidad_consolidada {where_base} GROUP BY 1")
+    por_estado = _fetchall_dict(cur)
+    cur.execute(f"SELECT entidad_nombre AS nombre, COUNT(*) AS total FROM gold.mortalidad_consolidada {where_base} GROUP BY 1 ORDER BY 2 DESC LIMIT 1")
+    row = cur.fetchone()
+    top_estado = {'nombre': row[0] if row else 'N/A', 'total': row[1] if row else 0}
+    return {'total_muertes': total_muertes, 'total_sin_atencion': total_sin_atencion, 'serie_anual': serie_anual, 'por_edad': por_edad, 'por_sitio': por_sitio, 'por_estado': por_estado, 'top_estado': top_estado}
 
 def anios_disponibles():
     with connection.cursor() as cur:
-        cur.execute("SELECT DISTINCT anio FROM marts.mv_rmm_anual_entidad WHERE anio >= 2014 ORDER BY anio DESC")
+        cur.execute("SELECT DISTINCT anio FROM gold.mortalidad_consolidada WHERE anio >= 2014 ORDER BY 1 DESC")
         return [r[0] for r in cur.fetchall()]
 
 def entidades_disponibles():
     with connection.cursor() as cur:
-        cur.execute("SELECT DISTINCT id_entidad, entidad_nombre FROM marts.mv_rmm_anual_entidad ORDER BY entidad_nombre")
-        return dictfetchall(cur)
+        cur.execute("SELECT DISTINCT entidad_cve AS id_entidad, UPPER(entidad_nombre) AS entidad_nombre FROM gold.mortalidad_consolidada WHERE entidad_nombre IS NOT NULL ORDER BY 2")
+        return _fetchall_dict(cur)
+
+def kpi_rmm_ultimo_anio(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) FROM gold.mortalidad_consolidada {where}", params)
+        return {'defunciones': cur.fetchone()[0], 'rmm': 'N/A'}
+
+def causas_agrupadas(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT COALESCE(causa_desc, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where} GROUP BY 1 ORDER BY 2 DESC LIMIT 8", params)
+        return _fetchall_dict(cur)
+
+def distribucion_edad(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT COALESCE(edad_quinquenal, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where} GROUP BY 1 ORDER BY 1", params)
+        return _fetchall_dict(cur)
+
+def distribucion_sitio(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT COALESCE(sitio_defuncion, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where} GROUP BY 1 ORDER BY 2 DESC LIMIT 5", params)
+        return _fetchall_dict(cur)
+
+def distribucion_escolaridad(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT COALESCE(escolaridad, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where} GROUP BY 1 ORDER BY 2 DESC LIMIT 5", params)
+        return _fetchall_dict(cur)
+
+def distribucion_ocupacion(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT COALESCE(ocupacion, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where} GROUP BY 1 ORDER BY 2 DESC LIMIT 5", params)
+        return _fetchall_dict(cur)
+
+def distribucion_derechohabiencia(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT COALESCE(derechohabiencia, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where} GROUP BY 1 ORDER BY 2 DESC LIMIT 5", params)
+        return _fetchall_dict(cur)
+
+def datos_mapa(anio, nivel_mapa, entidad_id=None):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        if nivel_mapa == 'ESTADO':
+            cur.execute(f"SELECT entidad_cve AS id, UPPER(entidad_nombre) AS nombre, COUNT(*) AS total FROM gold.mortalidad_consolidada {where} GROUP BY 1, 2", params)
+        else:
+            cur.execute(f"SELECT entidad_cve || '-' || municipio_cve AS id, UPPER(municipio_nombre) AS nombre, dl.lat_decimal, dl.lon_decimal, COUNT(*) AS total FROM gold.mortalidad_consolidada g JOIN gold.dim_localidad dl ON dl.cve_ent = g.entidad_cve AND dl.cve_mun = g.municipio_cve AND dl.cve_loc = '0001' {where} AND dl.lat_decimal IS NOT NULL GROUP BY 1, 2, 3, 4", params)
+        return _fetchall_dict(cur)
+
+def ranking_estados_rmm(anio, entidad_id=None):
+    where, params = _build_where(anio, entidad_id)
+    group_by = "UPPER(municipio_nombre)" if entidad_id else "UPPER(entidad_nombre)"
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT {group_by} AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where} GROUP BY 1 ORDER BY 2 DESC LIMIT 10", params)
+        return _fetchall_dict(cur)
+
+def asistencia_vs_sitio(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT COALESCE(sitio_defuncion, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where} AND asistencia_medica ILIKE '%%SIN ATENCI%%' GROUP BY 1 ORDER BY 2 DESC LIMIT 5", params)
+        return _fetchall_dict(cur)
+
+def edad_por_causa(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT edad_quinquenal AS edad, causa_desc AS causa, COUNT(*) AS count FROM gold.mortalidad_consolidada {where} GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 15", params)
+        rows = cur.fetchall()
+    edades = sorted(list(set([r[0] for r in rows])))
+    causas = list(set([r[1] for r in rows]))[:5]
+    datasets = []
+    for c in causas:
+        data = [0] * len(edades)
+        for r in rows:
+            if r[1] == c and r[0] in edades: data[edades.index(r[0])] = r[2]
+        datasets.append({'label': c, 'data': data})
+    return {'labels': edades, 'datasets': datasets}
+
+def escolaridad_vs_derecho(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT escolaridad AS esc, derechohabiencia AS der, COUNT(*) AS count FROM gold.mortalidad_consolidada {where} GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 15", params)
+        rows = cur.fetchall()
+    escs = sorted(list(set([r[0] for r in rows])))
+    derechs = list(set([r[1] for r in rows]))[:3]
+    datasets = []
+    for d in derechs:
+        data = [0] * len(escs)
+        for r in rows:
+            if r[1] == d and r[0] in escs: data[escs.index(r[0])] = r[2]
+        datasets.append({'label': d, 'data': data})
+    return {'labels': escs, 'datasets': datasets}
+
+# --- NUEVAS FUNCIONES ---
+def distribucion_nivel_socioeconomico(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT COALESCE(nivel_socioeconomico, 'No esp.') AS etiqueta, COUNT(*) AS valor FROM gold.mortalidad_consolidada {where} GROUP BY 1 ORDER BY 2 DESC", params)
+        return _fetchall_dict(cur)
+
+def top_municipios_marginados(anio, entidad_id):
+    where, params = _build_where(anio, entidad_id)
+    with connection.cursor() as cur:
+        cur.execute(f"""
+            SELECT municipio_nombre || ' (' || entidad_nombre || ')' AS etiqueta, 
+                   COUNT(*) FILTER (WHERE nivel_socioeconomico = 'Baja') AS valor,
+                   ROUND((COUNT(*) FILTER (WHERE nivel_socioeconomico = 'Baja')::numeric / COUNT(*)) * 100, 1) AS pct
+            FROM gold.mortalidad_consolidada 
+            {where}
+            GROUP BY municipio_nombre, entidad_nombre
+            HAVING COUNT(*) >= 3
+            ORDER BY pct DESC, valor DESC
+            LIMIT 10
+        """, params)
+        return _fetchall_dict(cur)

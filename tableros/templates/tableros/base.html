@@ -1,40 +1,54 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ titulo }}{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'tableros/css/snd.css' %}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Sistema de Información - Secretaría de Salud{% endblock %}</title>
+
+    <!-- Framework GOB.mx v4 -->
+    <link href="https://framework-gb.cdn.gob.mx/gm/v4/image/favicon.ico" rel="shortcut icon">
+    <link href="https://framework-gb.cdn.gob.mx/gm/v4/css/main.css" rel="stylesheet">
+    
+    <!-- CSS Extra (Mapas, Gráficas) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Bloque para CSS personalizado de las vistas -->
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <header class="snd-header">
-        <div class="snd-container">
-            <div class="snd-brand">
-                <span class="snd-brand-mark">SND</span>
-                <span class="snd-brand-title">Sistema Nacional de Datos — Mortalidad Materna</span>
-            </div>
-            <nav class="snd-nav">
-                {% if user.rol == 'DIR' or user.rol == 'ADMIN' %}
-                    <a href="{% url 'tableros:directivo' %}">Tablero Directivo</a>
-                {% endif %}
-                <a href="{% url 'tableros:publico' %}">Tablero Público</a>
-                <span class="snd-user">{{ user.username }} ({{ user.get_rol_display }})</span>
-            </nav>
-        </div>
-    </header>
 
-    <main class="snd-container snd-main">
+    <!-- Barra de navegación superior institucional -->
+    <!--nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/" style="font-weight: bold; letter-spacing: 1px;">
+                SALUD <span style="font-weight: 300; font-size: 0.8em; margin-left: 10px;">| Tablero de Mortalidad Materna</span>
+            </a>
+        </div>
+    </nav-->
+
+    <!-- Contenido de la página -->
+    <main class="page" style="min-height: 80vh;">
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="snd-footer">
-        <div class="snd-container">
-            <p>Fuente: Registros de mortalidad materna, DGIS/SSA. Datos preliminares sujetos a revisión.</p>
+    <!-- Footer Institucional -->
+    <footer class="bg-dark text-white text-center py-4 mt-5">
+        <div class="container">
+            <p class="mb-0">© 2026 Secretaría de Salud. Datos Abiertos.</p>
         </div>
     </footer>
+
+    <!-- Librerías JS Globales -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Framework GOB.mx -->
+    <script src="https://framework-gb.cdn.gob.mx/gm/v4/js/gobmx.js"></script>
+
+    <!-- Bloque para JS personalizado de las vistas -->
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -8,7 +8,7 @@ from .models import (
     DimCausa,
     DimEdad,
     FactMortalidadMaterna,
-    NacimientosEstimados,
+    # NacimientosEstimados,  # ← PENDIENTE: modelo no definido en models.py
 )
 
 
@@ -115,13 +115,19 @@ class FactMortalidadMaternaAdmin(SoloLecturaAdmin):
 # ---------------------------------------------------------------------------
 # GOLD - PARAMÉTRICA
 # ---------------------------------------------------------------------------
-@admin.register(NacimientosEstimados)
-class NacimientosEstimadosAdmin(SoloLecturaAdmin):
-    """
-    Solo lectura desde el admin. La carga de nacimientos se hace por
-    management command o SQL directo para preservar la fuente oficial.
-    """
-    list_display   = ('anio', 'id_entidad', 'nacimientos', 'fuente', 'fecha_carga')
-    list_filter    = ('anio', 'fuente')
-    search_fields  = ('fuente',)
-    ordering       = ('-anio', 'id_entidad')
+# NacimientosEstimados: modelo aún no definido en datalake/models.py.
+#
+# Cuando lo crees (con su migración), descomenta DOS cosas:
+#   1) el import en la parte superior de este archivo
+#   2) el bloque de abajo
+#
+# @admin.register(NacimientosEstimados)
+# class NacimientosEstimadosAdmin(SoloLecturaAdmin):
+#     """
+#     Solo lectura desde el admin. La carga de nacimientos se hace por
+#     management command o SQL directo para preservar la fuente oficial.
+#     """
+#     list_display   = ('anio', 'id_entidad', 'nacimientos', 'fuente', 'fecha_carga')
+#     list_filter    = ('anio', 'fuente')
+#     search_fields  = ('fuente',)
+#     ordering       = ('-anio', 'id_entidad')

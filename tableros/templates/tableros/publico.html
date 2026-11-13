@@ -1,135 +1,210 @@
 {% extends 'tableros/base.html' %}
 {% load static %}
 
+{% block title %}Mortalidad Materna en México - Datos Abiertos{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pub-hero { background: #10312B; color: white; padding: 60px 20px; text-align: center; border-radius: 8px; margin-bottom: 40px; margin-top: 30px;}
+    .pub-hero h2 { font-size: 1.5rem; font-weight: 300; margin-bottom: 15px; }
+    .pub-hero .big-number { font-size: 5rem; font-weight: 900; color: #BC955C; line-height: 1; margin: 20px 0; }
+    .pub-hero p { font-size: 1.2rem; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+    
+    .pub-stat-card { background: white; padding: 30px; border-radius: 8px; border-left: 6px solid #691C32; box-shadow: 0 4px 15px rgba(0,0,0,0.05); height: 100%; }
+    .pub-stat-card .num { font-size: 3rem; font-weight: 900; color: #691C32; line-height: 1; margin-bottom: 10px; }
+    .pub-stat-card .txt { font-size: 1.1rem; color: #444; }
+    
+    .pub-chart-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; }
+    .pub-chart-box h3 { color: #10312B; font-size: 1.5rem; margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; font-weight: 700; }
+    .pub-chart-box p { color: #666; margin-bottom: 20px; line-height: 1.5; font-size: 1rem; }
+    
+    #mapaPublico { height: 500px; width: 100%; border-radius: 8px; background: #e9ecef; z-index: 1; }
+    
+    .mapa-leyenda { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px; font-size: 12px; color: #333; flex-wrap: wrap; }
+    .mapa-leyenda-item { display: flex; align-items: center; gap: 6px; }
+    .mapa-color-box { width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; }
+
+    .pub-journalist-box { background: #f4f5f7; border: 2px dashed #BC955C; padding: 40px; border-radius: 8px; text-align: center; margin-top: 40px; margin-bottom: 40px; }
+    .btn-download { background: #1D6F42; color: white; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 10px; margin-top: 15px; transition: 0.3s; }
+    .btn-download:hover { background: #155932; color: white; }
+</style>
+{% endblock %}
+
 {% block content %}
-<h1 class="snd-h1">{{ titulo }}</h1>
-
-<form method="get" class="snd-filters">
-    <label>Año (desde 2014):
-        <select name="anio" required>
-            {% for a in anios %}
-                <option value="{{ a }}" {% if a == anio %}selected{% endif %}>{{ a }}</option>
-            {% endfor %}
-        </select>
-    </label>
-    <label>Entidad:
-        <select name="id_entidad" required>
-            <option value="">— Selecciona —</option>
-            {% for e in entidades %}
-                <option value="{{ e.id_entidad }}" {% if id_entidad == e.id_entidad %}selected{% endif %}>
-                    {{ e.entidad_nombre }}
-                </option>
-            {% endfor %}
-        </select>
-    </label>
-    <button type="submit" class="snd-btn">Consultar</button>
-</form>
-
-<section class="snd-card">
-    <h2>Indicador {{ anio }}{% if entidad_sel %} — {{ entidad_sel.entidad_nombre }}{% endif %}</h2>
-    <p class="snd-kpi-num">{{ kpi.rmm|default:"—" }}</p>
-    <p class="snd-kpi-detalle">
-        {{ kpi.defunciones|default:"0" }} defunciones incluidas · {{ kpi.nacimientos|default:"0" }} nacimientos estimados
-    </p>
-</section>
-
-<div class="snd-grid-2">
-    <section class="snd-card">
-        <h2>Proporción directa / indirecta</h2>
-        <div style="position: relative; height: 280px; width: 100%;">
-            <canvas id="chartDona"></canvas>
-        </div>
+<div class="container">
+    
+    <section class="pub-hero">
+        <h2>La realidad de la muerte materna en México (2014 - 2024)</h2>
+        <div class="big-number">{{ total_muertes|floatformat:"0" }}</div>
+        <p>Mujeres perdieron la vida por causas relacionadas con el embarazo, parto o puerperio en la última década.</p>
     </section>
-    <section class="snd-card">
-        <h2>Distribución por edad</h2>
-        <div style="position: relative; height: 280px; width: 100%;">
-            <canvas id="chartEdad"></canvas>
+
+    <div class="row mb-5">
+        <div class="col-md-6 mb-4">
+            <div class="pub-stat-card">
+                <div class="num">{{ pct_sin_atencion }}%</div>
+                <div class="txt">de estas muertes ocurrieron <strong>sin atención médica</strong> ({{ total_sin_atencion }} casos). Esto significa que muchas de ellas pudieron haberse evitado.</div>
+            </div>
         </div>
-    </section>
+        <div class="col-md-6 mb-4">
+            <div class="pub-stat-card">
+                <div class="num">{{ top_estado_total|floatformat:"0" }}</div>
+                <div class="txt">muertes registradas en <strong>{{ top_estado_nombre }}</strong>, siendo la entidad federativa con el mayor número absoluto de casos en la última década.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="pub-chart-box">
+        <h3>¿Estamos mejorando o empeorando?</h3>
+        <p>Observa cómo ha cambiado el número de muertes maternas año con año. El repunte de 2020 y 2021 coincide con la crisis sanitaria por COVID-19, que limitó el acceso a servicios médicos.</p>
+        <div style="position: relative; height: 350px; width: 100%;">
+            <canvas id="chartPublicoSerie"></canvas>
+        </div>
+    </div>
+
+    <div class="pub-chart-box">
+        <h3>¿Dónde está ocurriendo?</h3>
+        <p>Explora el mapa para ver cuántas muertes maternas se han registrado en tu estado. Pasa el cursor o toca los estados para ver el detalle.</p>
+        <div id="mapaPublico"></div>
+        <div class="mapa-leyenda">
+            <span style="font-weight: bold; color: #691C32;">Intensidad de casos:</span>
+            <div class="mapa-leyenda-item"><div class="mapa-color-box" style="background-color: #f2c6d3;"></div> <span id="pub-rango-bajo">Menos</span></div>
+            <div class="mapa-leyenda-item"><div class="mapa-color-box" style="background-color: #b03a5e;"></div> <span id="pub-rango-medio-bajo">Moderado</span></div>
+            <div class="mapa-leyenda-item"><div class="mapa-color-box" style="background-color: #691C32;"></div> <span id="pub-rango-medio-alto">Alto</span></div>
+            <div class="mapa-leyenda-item"><div class="mapa-color-box" style="background-color: #3b0a1e;"></div> <span id="pub-rango-alto">Muy Alto</span></div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="pub-chart-box h-100">
+                <h3>¿Quiénes eran?</h3>
+                <p>Distribución de las defunciones por grupo de edad. Los embarazos en adolescentes (15-19 años) representan un riesgo significativo.</p>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="chartPublicoEdad"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="pub-chart-box h-100">
+                <h3>¿Dónde fallecieron?</h3>
+                <p>El lugar donde ocurre la muerte revela mucho sobre la oportunidad de atención. Un alto porcentaje de muertes en casa o vía pública indica falta de acceso oportuno.</p>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="chartPublicoSitio"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="pub-journalist-box">
+        <h3>📊 Zona de Datos Abiertos para Periodistas</h3>
+        <p>Descarga los datos consolidados utilizados en este tablero. Puedes usarlos para tus investigaciones, reportajes o visualizaciones.</p>
+        <!-- ENLACE REAL A LA DESCARGA DE EXCEL -->
+        <a href="/tableros/descargar-excel/" class="btn-download">
+            ⬇️ Descargar Datos (Excel)
+        </a>
+    </div>
+
 </div>
 
-<section class="snd-card">
-    <h2>Tabla de causas agrupadas</h2>
-    <table class="snd-table">
-        <thead>
-            <tr>
-                <th>Causa (Grupo DGE)</th>
-                <th style="text-align: right;">Defunciones</th>
-            </tr>
-        </thead>
-        <tbody id="tabla-causas-body">
-            <!-- Se llena con JavaScript -->
-        </tbody>
-    </table>
-</section>
+{{ serie_anual_json|json_script:"pub-serie-data" }}
+{{ por_edad_json|json_script:"pub-edad-data" }}
+{{ por_sitio_json|json_script:"pub-sitio-data" }}
+{{ por_estado_json|json_script:"pub-estado-data" }}
+{% endblock %}
 
-<p class="snd-disclaimer">{{ disclaimer }}</p>
-
-<!-- Inyección del JSON con los datos -->
-{{ datos_publicos_json|json_script:"datos-publicos" }}
-
+{% block extra_js %}
 <script>
-try {
-    const data = JSON.parse(document.getElementById('datos-publicos').textContent);
+    const COLOR_VERDE = '#10312B';
+    const COLOR_GUINDA = '#691C32';
+    const COLOR_DORADO = '#BC955C';
+    const COLORES_CAUSAS = ['#691C32', '#10312B', '#BC955C', '#6F7271', '#4a0d26', '#1a6e3a'];
 
-    // 1. Gráfica Dona (Directa vs Indirecta)
-    const directa = data.causas.labels.map((label, i) => {
-        return label !== 'Indirectas' ? Number(data.causas.valores[i]) : 0;
-    }).reduce((a, b) => a + b, 0);
-    
-    const indirecta = data.causas.labels.map((label, i) => {
-        return label === 'Indirectas' ? Number(data.causas.valores[i]) : 0;
-    }).reduce((a, b) => a + b, 0);
-
-    new Chart(document.getElementById('chartDona'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Directa', 'Indirecta'],
-            datasets: [{
-                data: [directa, indirecta],
-                backgroundColor: ['#611232', '#1a6e3a'],
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-
-    // 2. Gráfica de Edad
-    new Chart(document.getElementById('chartEdad'), {
-        type: 'bar',
-        data: {
-            labels: data.edades.labels,
-            datasets: [{
-                label: 'Defunciones',
-                data: data.edades.valores,
-                backgroundColor: '#611232',
-            }]
-        },
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } }
+    function extraerNombre(props, claveFallback) {
+        const nombresPosibles = ['NOM_ENT', 'nom_ent', 'NOMBRE', 'nombre', 'NAME', 'name', 'ENTIDAD', 'entidad'];
+        for (let key of nombresPosibles) {
+            if (props[key]) return props[key];
         }
-    });
-
-    // 3. Llenar la Tabla de Causas
-    const tbody = document.getElementById('tabla-causas-body');
-    if (data.causas.labels.length > 0 && data.causas.labels[0] !== 'Sin datos') {
-        data.causas.labels.forEach((label, index) => {
-            const valor = data.causas.valores[index];
-            tbody.innerHTML += `
-                <tr>
-                    <td>${label}</td>
-                    <td style="text-align: right;"><strong>${valor}</strong></td>
-                </tr>
-            `;
-        });
-    } else {
-        tbody.innerHTML = '<tr><td colspan="2" style="text-align: center;">Sin datos para los filtros seleccionados.</td></tr>';
+        return 'Entidad ' + claveFallback;
     }
 
-} catch (e) {
-    console.error("Error al dibujar las gráficas del tablero público:", e);
-}
+    try {
+        const serie = JSON.parse(document.getElementById('pub-serie-data').textContent);
+        if (serie && serie.length > 0) {
+            new Chart(document.getElementById('chartPublicoSerie'), {
+                type: 'line',
+                data: { labels: serie.map(d => d.anio), datasets: [{ label: 'Muertes', data: serie.map(d => d.total), borderColor: COLOR_GUINDA, backgroundColor: 'rgba(105,28,50,0.1)', borderWidth: 3, pointRadius: 5, fill: true, tension: 0.3 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
+    } catch (e) { console.error(e); }
+
+    try {
+        const edades = JSON.parse(document.getElementById('pub-edad-data').textContent);
+        if (edades && edades.length > 0) {
+            new Chart(document.getElementById('chartPublicoEdad'), {
+                type: 'bar',
+                data: { labels: edades.map(d => d.etiqueta), datasets: [{ data: edades.map(d => d.valor), backgroundColor: edades.map(d => d.etiqueta.includes('15 a 19') || d.etiqueta.includes('10 a 14') ? COLOR_GUINDA : COLOR_DORADO) }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+    } catch (e) { console.error(e); }
+
+    try {
+        const sitios = JSON.parse(document.getElementById('pub-sitio-data').textContent);
+        if (sitios && sitios.length > 0) {
+            new Chart(document.getElementById('chartPublicoSitio'), {
+                type: 'doughnut',
+                data: { labels: sitios.map(d => d.etiqueta), datasets: [{ data: sitios.map(d => d.valor), backgroundColor: COLORES_CAUSAS }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+            });
+        }
+    } catch (e) { console.error(e); }
+
+    try {
+        const estadosData = JSON.parse(document.getElementById('pub-estado-data').textContent);
+        const mapPub = L.map('mapaPublico', { zoomControl: false }).setView([23.6, -102.5], 4);
+        
+        const defuncionesPorClave = {};
+        let maxDef = 0;
+        estadosData.forEach(e => { 
+            defuncionesPorClave[String(e.id).padStart(2, '0')] = e.total; 
+            if (e.total > maxDef) maxDef = e.total;
+        });
+
+        document.getElementById('pub-rango-bajo').innerText = '0 - ' + Math.round(maxDef * 0.2);
+        document.getElementById('pub-rango-medio-bajo').innerText = (Math.round(maxDef * 0.2) + 1) + ' - ' + Math.round(maxDef * 0.5);
+        document.getElementById('pub-rango-medio-alto').innerText = (Math.round(maxDef * 0.5) + 1) + ' - ' + Math.round(maxDef * 0.8);
+        document.getElementById('pub-rango-alto').innerText = 'Más de ' + Math.round(maxDef * 0.8);
+
+        function getColor(total) {
+            if (!total) return '#e0e0e0';
+            return total > maxDef * 0.8 ? '#3b0a1e' :
+                   total > maxDef * 0.5 ? '#691C32' :
+                   total > maxDef * 0.2 ? '#b03a5e' :
+                   '#f2c6d3';
+        }
+
+        fetch("{% static 'tableros/geo/estados.geojson' %}")
+            .then(r => r.json())
+            .then(geojson => {
+                L.geoJSON(geojson, {
+                    style: feature => {
+                        const cve = feature.id || feature.properties.cve_ent || feature.properties.CVE_ENT;
+                        const clave = cve ? String(cve).padStart(2, '0') : null;
+                        return { fillColor: getColor(defuncionesPorClave[clave]), weight: 1, color: '#fff', fillOpacity: 0.9 };
+                    },
+                    onEachFeature: (feature, layer) => {
+                        const props = feature.properties;
+                        const cve = feature.id || props.cve_ent || props.CVE_ENT;
+                        const clave = cve ? String(cve).padStart(2, '0') : null;
+                        const nombre = extraerNombre(props, clave);
+                        layer.bindPopup('<div style="text-align:center;"><strong>' + nombre + '</strong><br>' + (defuncionesPorClave[clave] || 0) + ' muertes</div>');
+                    }
+                }).addTo(mapPub);
+            });
+            
+        L.control.zoom({ position: 'bottomright' }).addTo(mapPub);
+    } catch (e) { console.error(e); }
 </script>
 {% endblock %}

@@ -1,0 +1,156 @@
+{% extends 'tableros/base.html' %}
+{% block title %}Cargar Datos - DGIS{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* --- ESTILOS DEL COMPONENTE DE CARGA --- */
+    .upload-container {
+        border: 2px dashed #d1d5db;
+        border-radius: 12px;
+        padding: 20px 25px;
+        background-color: #ffffff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+    }
+    .upload-container:hover {
+        border-color: #611232;
+        background-color: #fcfcfc;
+    }
+    .upload-text strong {
+        display: block;
+        font-size: 1.1rem;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    .upload-text span {
+        font-size: 0.9rem;
+        color: #6b7280;
+    }
+    .btn-select-file {
+        background-color: #ffffff;
+        color: #611232;
+        border: 1px solid #611232;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+        font-size: 0.95rem;
+        margin: 0;
+    }
+    .btn-select-file:hover {
+        background-color: #611232;
+        color: #ffffff;
+    }
+    .file-name-display {
+        display: none;
+        font-size: 0.9rem;
+        color: #1D6F42;
+        font-weight: bold;
+        margin-top: 10px;
+    }
+    .btn-procesar {
+        background-color: #611232;
+        color: white;
+        width: 100%;
+        padding: 15px;
+        border: none;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    .btn-procesar:hover {
+        background-color: #4a0d26;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0" style="border-top: 5px solid #10312B;">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-4 pb-0">
+                    <h3 class="mb-0 fw-bold" style="color: #10312B;">Carga de Archivos DGIS</h3>
+                    <form method="post" action="{% url 'logout' %}" style="margin:0;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger fw-bold">Salir</button>
+                    </form>
+                </div>
+                <div class="card-body p-4">
+                    
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <p class="text-muted mb-4">
+                        Sube los archivos oficiales de la <strong>Dirección General de Información en Salud (DGIS)</strong>. 
+                        El sistema procesará automáticamente los datos a través de las capas Bronze, Silver y Gold.
+                    </p>
+                    
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <!-- COMPONENTE DE CARGA PERSONALIZADO -->
+                        <div class="upload-container">
+                            <div class="upload-text">
+                                <strong>Cargar o arrastrar archivo</strong>
+                                <span>Formato principal: CSV / Próximamente: PDF (Máx. 20 MB)</span>
+                                <div id="file-name" class="file-name-display"></div>
+                            </div>
+                            <label for="archivo_csv" class="btn-select-file">
+                                Seleccionar archivo
+                                <!-- Icono de subida SVG -->
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M8 0a.5.5 0 0 1 .5.5v6.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 7.293V.5A.5.5 0 0 1 8 0z"/>
+                                    <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+                                </svg>
+                            </label>
+                            <!-- Input oculto real -->
+                            <input class="d-none" type="file" id="archivo_csv" name="archivo_csv" accept=".csv, .pdf" required onchange="updateFileName(this)">
+                        </div>
+
+                        <button type="submit" class="btn-procesar">Procesar y Actualizar Tableros</button>
+                    </form>
+
+                    {% if ultima_carga %}
+                    <hr class="my-4">
+                    <div class="alert alert-secondary mt-3">
+                        <h6 class="fw-bold mb-2">Última carga registrada:</h6>
+                        <strong>Archivo:</strong> {{ ultima_carga.0 }}<br>
+                        <strong>Registros:</strong> {{ ultima_carga.1 }}<br>
+                        <strong>Fecha:</strong> {{ ultima_carga.2|date:"Y-m-d H:i" }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Script para mostrar el nombre del archivo seleccionado
+    function updateFileName(input) {
+        const fileNameDisplay = document.getElementById('file-name');
+        if (input.files && input.files.length > 0) {
+            fileNameDisplay.style.display = 'block';
+            fileNameDisplay.textContent = 'Archivo seleccionado: ' + input.files[0].name;
+        } else {
+            fileNameDisplay.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}
