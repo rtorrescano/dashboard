@@ -32,7 +32,7 @@ INSTALLED_APPS = [
     'usuarios',
     'tableros',
     'catalogos',
-    'datalake',
+    #'datalake',
 ]
 
 MIDDLEWARE = [

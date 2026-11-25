@@ -5,27 +5,30 @@
 
 {% block extra_css %}
 <style>
+    /* Ajustes de legibilidad solicitados */
     .pub-hero { background: #10312B; color: white; padding: 60px 20px; text-align: center; border-radius: 8px; margin-bottom: 40px; margin-top: 30px;}
-    .pub-hero h2 { font-size: 1.5rem; font-weight: 300; margin-bottom: 15px; }
+    .pub-hero h2 { font-size: 20px; font-weight: 400; margin-bottom: 15px; }
     .pub-hero .big-number { font-size: 5rem; font-weight: 900; color: #BC955C; line-height: 1; margin: 20px 0; }
-    .pub-hero p { font-size: 1.2rem; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+    .pub-hero p { font-size: 16px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
     
     .pub-stat-card { background: white; padding: 30px; border-radius: 8px; border-left: 6px solid #691C32; box-shadow: 0 4px 15px rgba(0,0,0,0.05); height: 100%; }
     .pub-stat-card .num { font-size: 3rem; font-weight: 900; color: #691C32; line-height: 1; margin-bottom: 10px; }
-    .pub-stat-card .txt { font-size: 1.1rem; color: #444; }
+    .pub-stat-card .txt { font-size: 16px; color: #444; line-height: 1.5; }
     
     .pub-chart-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; }
-    .pub-chart-box h3 { color: #10312B; font-size: 1.5rem; margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; font-weight: 700; }
-    .pub-chart-box p { color: #666; margin-bottom: 20px; line-height: 1.5; font-size: 1rem; }
+    .pub-chart-box h3 { color: #10312B; font-size: 20px; margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; font-weight: 700; }
+    .pub-chart-box p { color: #666; margin-bottom: 20px; line-height: 1.5; font-size: 16px; }
     
     #mapaPublico { height: 500px; width: 100%; border-radius: 8px; background: #e9ecef; z-index: 1; }
     
-    .mapa-leyenda { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px; font-size: 12px; color: #333; flex-wrap: wrap; }
+    .mapa-leyenda { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px; font-size: 14px; color: #333; flex-wrap: wrap; }
     .mapa-leyenda-item { display: flex; align-items: center; gap: 6px; }
     .mapa-color-box { width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; }
 
     .pub-journalist-box { background: #f4f5f7; border: 2px dashed #BC955C; padding: 40px; border-radius: 8px; text-align: center; margin-top: 40px; margin-bottom: 40px; }
-    .btn-download { background: #1D6F42; color: white; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 10px; margin-top: 15px; transition: 0.3s; }
+    .pub-journalist-box h3 { font-size: 20px; color: #691C32; }
+    .pub-journalist-box p { font-size: 16px; }
+    .btn-download { background: #1D6F42; color: white; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 10px; margin-top: 15px; transition: 0.3s; font-size: 16px; }
     .btn-download:hover { background: #155932; color: white; }
 </style>
 {% endblock %}
@@ -34,9 +37,10 @@
 <div class="container">
     
     <section class="pub-hero">
-        <h2>La realidad de la muerte materna en México (2014 - 2024)</h2>
+        <!-- AQUÍ EL CAMBIO A 2002 - 2024 -->
+        <h2>La realidad de la muerte materna en México (2002 - 2024)</h2>
         <div class="big-number">{{ total_muertes|floatformat:"0" }}</div>
-        <p>Mujeres perdieron la vida por causas relacionadas con el embarazo, parto o puerperio en la última década.</p>
+        <p>Mujeres perdieron la vida por causas relacionadas con el embarazo, parto o puerperio en las últimas dos décadas.</p>
     </section>
 
     <div class="row mb-5">
@@ -49,7 +53,7 @@
         <div class="col-md-6 mb-4">
             <div class="pub-stat-card">
                 <div class="num">{{ top_estado_total|floatformat:"0" }}</div>
-                <div class="txt">muertes registradas en <strong>{{ top_estado_nombre }}</strong>, siendo la entidad federativa con el mayor número absoluto de casos en la última década.</div>
+                <div class="txt">muertes registradas en <strong>{{ top_estado_nombre }}</strong>, siendo la entidad federativa con el mayor número absoluto de casos en las últimas dos décadas.</div>
             </div>
         </div>
     </div>
@@ -99,9 +103,8 @@
     <div class="pub-journalist-box">
         <h3>📊 Zona de Datos Abiertos para Periodistas</h3>
         <p>Descarga los datos consolidados utilizados en este tablero. Puedes usarlos para tus investigaciones, reportajes o visualizaciones.</p>
-        <!-- ENLACE REAL A LA DESCARGA DE EXCEL -->
-        <a href="/tableros/descargar-excel/" class="btn-download">
-            ⬇️ Descargar Datos (Excel)
+        <a href="#" onclick="descargarDatos()" class="btn-download">
+            ⬇️ Descargar Datos (CSV)
         </a>
     </div>
 
@@ -134,7 +137,14 @@
             new Chart(document.getElementById('chartPublicoSerie'), {
                 type: 'line',
                 data: { labels: serie.map(d => d.anio), datasets: [{ label: 'Muertes', data: serie.map(d => d.total), borderColor: COLOR_GUINDA, backgroundColor: 'rgba(105,28,50,0.1)', borderWidth: 3, pointRadius: 5, fill: true, tension: 0.3 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } }, 
+                    scales: { 
+                        y: { beginAtZero: true, ticks: { font: { size: 14 } } }, 
+                        x: { ticks: { font: { size: 14 } } } 
+                    } 
+                }
             });
         }
     } catch (e) { console.error(e); }
@@ -145,7 +155,7 @@
             new Chart(document.getElementById('chartPublicoEdad'), {
                 type: 'bar',
                 data: { labels: edades.map(d => d.etiqueta), datasets: [{ data: edades.map(d => d.valor), backgroundColor: edades.map(d => d.etiqueta.includes('15 a 19') || d.etiqueta.includes('10 a 14') ? COLOR_GUINDA : COLOR_DORADO) }] },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 14 } } }, y: { ticks: { font: { size: 14 } } } } }
             });
         }
     } catch (e) { console.error(e); }
@@ -156,7 +166,7 @@
             new Chart(document.getElementById('chartPublicoSitio'), {
                 type: 'doughnut',
                 data: { labels: sitios.map(d => d.etiqueta), datasets: [{ data: sitios.map(d => d.valor), backgroundColor: COLORES_CAUSAS }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 14 } } } } }
             });
         }
     } catch (e) { console.error(e); }
@@ -195,16 +205,18 @@
                         return { fillColor: getColor(defuncionesPorClave[clave]), weight: 1, color: '#fff', fillOpacity: 0.9 };
                     },
                     onEachFeature: (feature, layer) => {
-                        const props = feature.properties;
+                        const props = feature.properties || {};
                         const cve = feature.id || props.cve_ent || props.CVE_ENT;
                         const clave = cve ? String(cve).padStart(2, '0') : null;
                         const nombre = extraerNombre(props, clave);
-                        layer.bindPopup('<div style="text-align:center;"><strong>' + nombre + '</strong><br>' + (defuncionesPorClave[clave] || 0) + ' muertes</div>');
+                        layer.bindPopup('<div style="text-align:center; font-size: 14px;"><strong>' + nombre + '</strong><br>' + (defuncionesPorClave[clave] || 0) + ' muertes</div>');
                     }
                 }).addTo(mapPub);
             });
             
         L.control.zoom({ position: 'bottomright' }).addTo(mapPub);
     } catch (e) { console.error(e); }
+    
+    function descargarDatos() { alert("El archivo CSV se generará aquí."); }
 </script>
 {% endblock %}

@@ -1,0 +1,21 @@
+﻿# Entorno virtual
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Variables de entorno (CRÍTICO NO SUBIR)
+.env
+
+# Archivos subidos por usuarios
+media/uploads/*.csv
+
+# Respaldos
+*.dump
+
+# Sistema Operativo
+.DS_Store
+Thumbs.db

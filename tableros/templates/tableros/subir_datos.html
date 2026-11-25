@@ -3,73 +3,70 @@
 
 {% block extra_css %}
 <style>
-    /* --- ESTILOS DEL COMPONENTE DE CARGA --- */
-    .upload-container {
-        border: 2px dashed #d1d5db;
-        border-radius: 12px;
-        padding: 20px 25px;
-        background-color: #ffffff;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: all 0.3s ease;
-        margin-bottom: 20px;
+    /* Paleta institucional GOB.mx */
+    .card-institucional {
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        overflow: hidden;
     }
-    .upload-container:hover {
-        border-color: #611232;
-        background-color: #fcfcfc;
+    .card-institucional .card-header {
+        background-color: #611232; /* Guinda Institucional */
+        color: white;
+        padding: 20px;
+        border-bottom: 4px solid #BC955C; /* Dorado */
     }
-    .upload-text strong {
-        display: block;
-        font-size: 1.1rem;
-        color: #333;
-        margin-bottom: 5px;
-    }
-    .upload-text span {
-        font-size: 0.9rem;
-        color: #6b7280;
-    }
-    .btn-select-file {
-        background-color: #ffffff;
-        color: #611232;
-        border: 1px solid #611232;
-        padding: 10px 20px;
-        border-radius: 6px;
+    .card-institucional .card-header h4 {
         font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    .drop-zone {
+        border: 2px dashed #BC955C;
+        border-radius: 8px;
+        padding: 50px 20px;
+        text-align: center;
+        background-color: #f8f9fa;
         cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: all 0.2s;
-        font-size: 0.95rem;
-        margin: 0;
+        transition: all 0.3s ease;
     }
-    .btn-select-file:hover {
-        background-color: #611232;
-        color: #ffffff;
+    .drop-zone:hover {
+        background-color: #f1f3f5;
+        border-color: #611232;
     }
-    .file-name-display {
-        display: none;
-        font-size: 0.9rem;
-        color: #1D6F42;
-        font-weight: bold;
-        margin-top: 10px;
+    .drop-zone-icon {
+        font-size: 3rem;
+        color: #BC955C;
+        margin-bottom: 15px;
     }
-    .btn-procesar {
+    .btn-institucional {
         background-color: #611232;
         color: white;
-        width: 100%;
-        padding: 15px;
         border: none;
-        border-radius: 6px;
-        font-weight: bold;
+        padding: 15px;
         font-size: 1.1rem;
-        cursor: pointer;
-        transition: background 0.3s;
+        font-weight: bold;
+        border-radius: 4px;
+        transition: background-color 0.3s;
     }
-    .btn-procesar:hover {
+    .btn-institucional:hover {
         background-color: #4a0d26;
         color: white;
+    }
+    .btn-outline-institucional {
+        border: 1px solid #611232;
+        color: #611232;
+        background: transparent;
+        font-weight: bold;
+    }
+    .btn-outline-institucional:hover {
+        background: #611232;
+        color: white;
+    }
+    .alert-carga {
+        background-color: #f4f5f7;
+        border-left: 5px solid #13322B; /* Verde Oscuro */
+        color: #333;
+        border-radius: 4px;
     }
 </style>
 {% endblock %}
@@ -78,13 +75,9 @@
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card shadow-sm border-0" style="border-top: 5px solid #10312B;">
-                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-4 pb-0">
-                    <h3 class="mb-0 fw-bold" style="color: #10312B;">Carga de Archivos DGIS</h3>
-                    <form method="post" action="{% url 'logout' %}" style="margin:0;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-danger fw-bold">Salir</button>
-                    </form>
+            <div class="card card-institucional">
+                <div class="card-header">
+                    <h4 class="mb-0">📁 Carga de Archivos DGIS</h4>
                 </div>
                 <div class="card-body p-4">
                     
@@ -96,43 +89,40 @@
                         {% endfor %}
                     {% endif %}
 
-                    <p class="text-muted mb-4">
-                        Sube los archivos oficiales de la <strong>Dirección General de Información en Salud (DGIS)</strong>. 
-                        El sistema procesará automáticamente los datos a través de las capas Bronze, Silver y Gold.
+                    <p class="text-muted mb-4" style="font-size: 15px;">
+                        Sube los archivos oficiales de la <strong>Dirección General de Información en Salud (DGIS)</strong>. El sistema procesará automáticamente los datos a través de las capas Bronze, Silver y Gold.
                     </p>
                     
-                    <form method="post" enctype="multipart/form-data">
+                    <form method="post" enctype="multipart/form-data" id="upload-form">
                         {% csrf_token %}
                         
-                        <!-- COMPONENTE DE CARGA PERSONALIZADO -->
-                        <div class="upload-container">
-                            <div class="upload-text">
-                                <strong>Cargar o arrastrar archivo</strong>
-                                <span>Formato principal: CSV / Próximamente: PDF (Máx. 20 MB)</span>
-                                <div id="file-name" class="file-name-display"></div>
-                            </div>
-                            <label for="archivo_csv" class="btn-select-file">
+                        <!-- Zona de Drag & Drop -->
+                        <div id="drop-area" class="drop-zone">
+                            <div class="drop-zone-icon">☁️</div>
+                            <p style="font-size: 1.2rem; color: #611232; margin-bottom: 10px; font-weight: bold;">
+                                Arrastra y suelta tu archivo aquí
+                            </p>
+                            <p style="color: #666; margin-bottom: 20px;">o</p>
+                            <button type="button" class="btn btn-outline-institucional" onclick="document.getElementById('archivo_csv').click()">
                                 Seleccionar archivo
-                                <!-- Icono de subida SVG -->
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                    <path fill-rule="evenodd" d="M8 0a.5.5 0 0 1 .5.5v6.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 7.293V.5A.5.5 0 0 1 8 0z"/>
-                                    <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
-                                </svg>
-                            </label>
-                            <!-- Input oculto real -->
-                            <input class="d-none" type="file" id="archivo_csv" name="archivo_csv" accept=".csv, .pdf" required onchange="updateFileName(this)">
+                            </button>
+                            <input type="file" id="archivo_csv" name="archivo_csv" accept=".csv" style="display: none;" required>
+                            <p id="file-name" style="margin-top: 15px; font-weight: bold; color: #13322B; font-size: 14px;"></p>
+                            <small class="text-muted">Formato principal: CSV (Máx. 20 MB)</small>
                         </div>
 
-                        <button type="submit" class="btn-procesar">Procesar y Actualizar Tableros</button>
+                        <button type="submit" class="btn btn-institucional w-100 mt-4">
+                            Procesar y Actualizar Tableros
+                        </button>
                     </form>
 
                     {% if ultima_carga %}
-                    <hr class="my-4">
-                    <div class="alert alert-secondary mt-3">
-                        <h6 class="fw-bold mb-2">Última carga registrada:</h6>
-                        <strong>Archivo:</strong> {{ ultima_carga.0 }}<br>
-                        <strong>Registros:</strong> {{ ultima_carga.1 }}<br>
-                        <strong>Fecha:</strong> {{ ultima_carga.2|date:"Y-m-d H:i" }}
+                    <hr class="my-4" style="border-top: 1px solid #e0e0e0;">
+                    <div class="alert alert-carga mt-3 text-center py-3">
+                        <strong style="color: #611232; font-size: 15px;">Última carga registrada</strong><br>
+                        <span class="text-muted" style="font-size: 14px;">Archivo:</span> {{ ultima_carga.0 }}<br>
+                        <span class="text-muted" style="font-size: 14px;">Registros:</span> {{ ultima_carga.1 }}<br>
+                        <span class="text-muted" style="font-size: 14px;">Fecha:</span> {{ ultima_carga.2|date:"Y-m-d H:i" }}
                     </div>
                     {% endif %}
                 </div>
@@ -141,16 +131,52 @@
     </div>
 </div>
 
+<!-- Script para Drag and Drop -->
 <script>
-    // Script para mostrar el nombre del archivo seleccionado
-    function updateFileName(input) {
+    document.addEventListener("DOMContentLoaded", function() {
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('archivo_csv');
         const fileNameDisplay = document.getElementById('file-name');
-        if (input.files && input.files.length > 0) {
-            fileNameDisplay.style.display = 'block';
-            fileNameDisplay.textContent = 'Archivo seleccionado: ' + input.files[0].name;
-        } else {
-            fileNameDisplay.style.display = 'none';
+
+        if (dropArea && fileInput) {
+            // Prevenir comportamiento por defecto del navegador
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+
+            // Efecto visual al arrastrar
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => {
+                    dropArea.style.backgroundColor = '#e9ecef';
+                    dropArea.style.borderColor = '#611232';
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => {
+                    dropArea.style.backgroundColor = '#f8f9fa';
+                    dropArea.style.borderColor = '#BC955C';
+                }, false);
+            });
+
+            // Capturar el archivo cuando se suelta
+            dropArea.addEventListener('drop', function(e) {
+                let dt = e.dataTransfer;
+                let files = dt.files;
+                fileInput.files = files;
+                fileNameDisplay.textContent = 'Archivo seleccionado: ' + files[0].name;
+            });
+
+            // Capturar el archivo cuando se elige por el botón
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    fileNameDisplay.textContent = 'Archivo seleccionado: ' + this.files[0].name;
+                }
+            });
         }
-    }
+    });
 </script>
 {% endblock %}

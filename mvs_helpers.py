@@ -13,65 +13,85 @@ def cargar_kpis_numeradores(anio_seleccionado, entidad_id=None):
         es_historico = True
         anio_filtro = 2024
 
-    where_est = ""
-    params_est = []
+    # AQUÍ EL CAMBIO A 2002
+    where_base = "WHERE TRIM(b.anio_defuncion) ~ '^[0-9]+$' AND TRIM(b.anio_defuncion)::int >= 2002"
+    params = []
+    
+    if not es_historico:
+        where_base += " AND TRIM(b.anio_defuncion)::int = %s"
+        params.append(anio_filtro)
+        
     if entidad_id:
-        where_est = " AND cve_ent = %s "
-        params_est.append(str(entidad_id).zfill(2))
+        where_base += " AND LPAD(TRIM(b.entidad_residencia), 2, '0') = %s"
+        params.append(str(entidad_id).zfill(2))
 
-    # 1. Muertes totales
-    if es_historico:
-        if entidad_id:
-            cur.execute(f"SELECT SUM(total) FROM gold.agg_mm_por_estado WHERE 1=1 {where_est}", params_est)
-        else:
-            cur.execute("SELECT SUM(total_maternas) FROM gold.agg_mm_nacional_anual")
-    else:
-        if entidad_id:
-            cur.execute(f"SELECT SUM(total) FROM gold.agg_mm_por_estado WHERE anio = %s {where_est}", [anio_filtro] + params_est)
-        else:
-            cur.execute("SELECT total_maternas FROM gold.agg_mm_nacional_anual WHERE anio = %s", [anio_filtro])
+    cur.execute(f"SELECT COUNT(*) FROM bronze.bronze_mortalidad_raw b {where_base}", params)
     row = cur.fetchone()
     total = row[0] if row else 0
 
-    # 2. Serie Temporal (por estado o nacional)
-    if entidad_id:
-        cur.execute(f"SELECT anio, total, incluidas, excluidas FROM gold.agg_mm_por_estado WHERE 1=1 {where_est} ORDER BY anio", params_est)
-    else:
-        cur.execute("SELECT anio, total_maternas, incluidas_rmm, excluidas_rmm FROM gold.agg_mm_nacional_anual ORDER BY anio")
-    serie = [{'anio': r[0], 'total': _i(r[1]), 'incluidas': _i(r[2]), 'excluidas': _i(r[3])} for r in cur.fetchall()]
-
-    # 3. Ranking (Municipios si hay estado, Estados si no)
-    if entidad_id:
-        cur.execute(f"SELECT cve_mun, nom_mun, SUM(total) as total FROM gold.agg_mm_por_municipio WHERE 1=1 {where_est} {'AND anio = %s' if not es_historico else ''} GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 15", params_est + ([anio_filtro] if not es_historico else []))
-        ranking = [{'nom_ent': r[1], 'total': _i(r[2]), 'var_pct': None, 'share_pct': None} for r in cur.fetchall()]
-    else:
-        cur.execute(f"SELECT nom_ent, SUM(total) as total FROM gold.agg_mm_por_estado WHERE 1=1 {'AND anio = %s' if not es_historico else ''} GROUP BY 1 ORDER BY 2 DESC", [anio_filtro] if not es_historico else [])
-        ranking = [{'nom_ent': r[0], 'total': _i(r[1]), 'var_pct': None, 'share_pct': None} for r in cur.fetchall()]
-
-    # 4. Variación Anual
     var_pct = None
-    if not es_historico and anio_filtro > 2014:
+    if not es_historico and anio_filtro > 2002:
+        params_prev = [anio_filtro - 1]
+        where_prev = "WHERE TRIM(b.anio_defuncion) ~ '^[0-9]+$' AND TRIM(b.anio_defuncion)::int = %s"
         if entidad_id:
-            cur.execute(f"SELECT total FROM gold.agg_mm_por_estado WHERE anio = %s {where_est}", [anio_filtro - 1] + params_est)
-        else:
-            cur.execute("SELECT total_maternas FROM gold.agg_mm_nacional_anual WHERE anio = %s", [anio_filtro - 1])
+            where_prev += " AND LPAD(TRIM(b.entidad_residencia), 2, '0') = %s"
+            params_prev.append(str(entidad_id).zfill(2))
+            
+        cur.execute(f"SELECT COUNT(*) FROM bronze.bronze_mortalidad_raw b {where_prev}", params_prev)
         r = cur.fetchone()
         prev = _f(r[0]) if r else None
         if prev and prev > 0:
             var_pct = round(100.0 * (_f(total) - prev) / prev, 1)
 
-    # 5. Evitables
-    cur.execute(f"SELECT ROUND(100.0 * SUM(sin_atencion)::numeric / NULLIF(SUM(total), 0), 1) FROM gold.agg_mm_evitabilidad WHERE 1=1 {'AND anio = %s' if not es_historico else ''} {where_est}", ([anio_filtro] if not es_historico else []) + params_est)
+    cur.execute(f"""
+        SELECT COUNT(*) FROM bronze.bronze_mortalidad_raw b 
+        {where_base} 
+        AND (asistencia_medicad ILIKE '%%SIN ATENCI%%' OR asistencia_medica ILIKE '%%SIN ATENCI%%' OR asistencia_medica = '2')
+    """, params)
     r = cur.fetchone()
-    pct_evitables = _f(r[0]) if r and r[0] is not None else None
+    total_sin_atencion = r[0] if r else 0
+    pct_evitables = round((total_sin_atencion / total) * 100, 1) if total > 0 else None
+
+    where_serie = "WHERE TRIM(b.anio_defuncion) ~ '^[0-9]+$' AND TRIM(b.anio_defuncion)::int BETWEEN 2002 AND 2024"
+    params_serie = []
+    if entidad_id:
+        where_serie += " AND LPAD(TRIM(b.entidad_residencia), 2, '0') = %s"
+        params_serie.append(str(entidad_id).zfill(2))
+        
+    cur.execute(f"SELECT TRIM(b.anio_defuncion)::int AS anio, COUNT(*) AS total FROM bronze.bronze_mortalidad_raw b {where_serie} GROUP BY 1 ORDER BY 1", params_serie)
+    serie = [{'anio': r[0], 'total': _i(r[1]), 'incluidas': _i(r[1]), 'excluidas': 0} for r in cur.fetchall()]
+
+    if entidad_id:
+        cur.execute(f"""
+            SELECT UPPER(dl.nom_mun) AS nom_ent, COUNT(*) AS total 
+            FROM bronze.bronze_mortalidad_raw b
+            JOIN gold.dim_localidad dl ON dl.cve_ent = LPAD(TRIM(b.entidad_residencia), 2, '0') AND dl.cve_mun = LPAD(TRIM(b.municipio_residencia), 3, '0') AND dl.cve_loc = '0001'
+            {where_base}
+            GROUP BY 1 ORDER BY 2 DESC LIMIT 10
+        """, params)
+    else:
+        cur.execute(f"""
+            SELECT UPPER(dl.nom_ent) AS nom_ent, COUNT(*) AS total 
+            FROM bronze.bronze_mortalidad_raw b
+            JOIN gold.dim_localidad dl ON dl.cve_ent = LPAD(TRIM(b.entidad_residencia), 2, '0') AND dl.cve_loc = '0001'
+            {where_base}
+            GROUP BY 1 ORDER BY 2 DESC LIMIT 10
+        """, params)
+    ranking = [{'nom_ent': r[0], 'total': _i(r[1]), 'var_pct': None, 'share_pct': None} for r in cur.fetchall()]
+
+    estados_alerta = 8 if not entidad_id else 1
+    municipios_foco = 165 if not entidad_id else 12
+    concentracion_top5 = 39.0 if not entidad_id else 100.0
+    if len(ranking) >= 5 and total > 0:
+        concentracion_top5 = round((sum([r['total'] for r in ranking[:5]]) / total) * 100, 1)
 
     kpi = {
         'muertes':              _i(total) or 0,
         'var_pct':              var_pct,
-        'estados_alerta':       8 if not entidad_id else 1,
+        'estados_alerta':       estados_alerta,
         'pct_evitables':        pct_evitables,
-        'municipios_foco':      165 if not entidad_id else 12,
-        'concentracion_top5':   39.0 if not entidad_id else 100.0,
+        'municipios_foco':      municipios_foco,
+        'concentracion_top5':   concentracion_top5,
     }
 
     return kpi, serie, ranking

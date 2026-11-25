@@ -19,7 +19,7 @@ urlpatterns = [
     
     # APLICACIONES
     path('admin/', admin.site.urls),
-    path('datalake/', include('datalake.urls')),
+    #path('datalake/', include('datalake.urls')),
     path('tableros/', include('tableros.urls')), 
 ]
 
